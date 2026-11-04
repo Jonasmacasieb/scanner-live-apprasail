@@ -2,11 +2,5 @@ services:
 
 type: web
 name: object-scouter
-env: node
-buildCommand: "npm install"
-startCommand: "npx serve -s ./ -l $PORT"
-routes:
-
-type: rewrite
-source: /*
-destination: /index.html
+env: static
+staticPublishPath: ./
