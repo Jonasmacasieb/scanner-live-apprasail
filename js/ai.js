@@ -1,260 +1,368 @@
 
-let customApiKey = sessionStorage.getItem('GEMINI_CUSTOM_API_KEY') || '';
+/* ==========================================
+   OBJECT SCOUTER
+   GEMINI BACKEND CLIENT
+   Render deployment
+========================================== */
 
-const GEMINI_MODEL = 'gemini-3-flash-preview';
-const GEMINI_API_URL =
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+const APPRAISAL_ENDPOINT = '/api/appraise';
 
-async function appraiseObjectWithGemini() {
-    if (isScanning) return;
+let isScanning = false;
 
-    if (!customApiKey) {
-        alert('Please enter your Gemini API key first.');
-        return;
+
+// ==========================================
+// CONNECTION STATUS
+// ==========================================
+
+function updateGeminiStatus(message, color) {
+    const status = document.getElementById('geminiApiStatus');
+
+    if (!status) return;
+
+    status.textContent = message;
+    status.className = `font-bold ${color}`;
+}
+
+
+async function checkGeminiConnection() {
+
+    updateGeminiStatus(
+        'CHECKING...',
+        'text-amber-400'
+    );
+
+    try {
+
+        const response = await fetch('/api/health', {
+            method: 'GET'
+        });
+
+        if (!response.ok) {
+            throw new Error('Backend unavailable');
+        }
+
+        const result = await response.json();
+
+        if (!result.ok) {
+            throw new Error('Gemini configuration unavailable');
+        }
+
+        updateGeminiStatus(
+            'CONNECTED',
+            'text-emerald-400'
+        );
+
+    } catch (error) {
+
+        console.error('Connection error:', error);
+
+        updateGeminiStatus(
+            'OFFLINE',
+            'text-red-400'
+        );
+    }
+}
+
+
+document.addEventListener('DOMContentLoaded', () => {
+    checkGeminiConnection();
+});
+
+
+// ==========================================
+// GET SCANNER CANVAS
+// ==========================================
+
+function getScannerCanvas() {
+
+    if (typeof canvas !== 'undefined' && canvas) {
+        return canvas;
     }
 
-    if (!canvas || !canvas.width || !canvas.height) {
-        alert('Camera image is not ready. Please try again.');
+    return document.getElementById('appCanvas');
+}
+
+
+// ==========================================
+// MAIN APPRAISAL
+// ==========================================
+
+async function appraiseObjectWithGemini() {
+
+    if (isScanning) return;
+
+    const scannerCanvas = getScannerCanvas();
+
+    if (
+        !scannerCanvas ||
+        scannerCanvas.width <= 0 ||
+        scannerCanvas.height <= 0
+    ) {
+        alert('Camera is not ready. Start your camera first.');
         return;
     }
 
     isScanning = true;
-    initAudioContext();
 
-    const laser = document.getElementById('scanningLaser');
-    const buttonText = document.getElementById('scanBtnText');
-    const statusText = document.getElementById('scouterStatusTextTop');
+    const laser =
+        document.getElementById('scanningLaser');
 
-    let thumbnailBase64 = '';
+    const buttonText =
+        document.getElementById('scanBtnText');
+
+    const statusText =
+        document.getElementById('scouterStatusTextTop');
+
+    let thumbnail = '';
 
     try {
-        // Start scanning animation
+
+        if (typeof initAudioContext === 'function') {
+            initAudioContext();
+        }
+
         laser?.classList.remove('hidden');
 
-        if (buttonText) buttonText.textContent = 'APPRAISING...';
-        if (statusText) statusText.textContent = 'ANALYZING OBJECT...';
+        if (buttonText) {
+            buttonText.textContent = 'APPRAISING...';
+        }
 
-        playSynthSound(1400, 'sawtooth', 0.2, 0.3);
+        if (statusText) {
+            statusText.textContent = 'ANALYZING OBJECT...';
+        }
 
-        // Capture thumbnail
-        const frameCanvas = document.createElement('canvas');
-        frameCanvas.width = 160;
-        frameCanvas.height = 90;
+        if (typeof playSynthSound === 'function') {
+            playSynthSound(1400, 'sawtooth', 0.2, 0.3);
+        }
 
-        const fCtx = frameCanvas.getContext('2d');
 
-        if (!fCtx) throw new Error('Cannot create thumbnail canvas.');
+        // IMAGE CAPTURE
 
-        fCtx.drawImage(canvas, 0, 0, 160, 90);
+        const maxWidth = 1024;
 
-        thumbnailBase64 = frameCanvas.toDataURL('image/jpeg', 0.6);
-
-        // Capture optimized API image
-        const maxWidth = 768;
-        const scale = Math.min(1, maxWidth / canvas.width);
-
-        const apiCanvas = document.createElement('canvas');
-
-        apiCanvas.width = Math.round(canvas.width * scale);
-        apiCanvas.height = Math.round(canvas.height * scale);
-
-        const aCtx = apiCanvas.getContext('2d');
-
-        if (!aCtx) throw new Error('Cannot create API image canvas.');
-
-        aCtx.drawImage(
-            canvas,
-            0,
-            0,
-            apiCanvas.width,
-            apiCanvas.height
+        const scale = Math.min(
+            1,
+            maxWidth / scannerCanvas.width
         );
 
-        const base64ImageData = apiCanvas
-            .toDataURL('image/jpeg', 0.65)
-            .split(',')[1];
+        const imageCanvas = document.createElement('canvas');
 
-        if (!base64ImageData) {
-            throw new Error('Failed to capture camera image.');
+        imageCanvas.width = Math.max(
+            1,
+            Math.round(scannerCanvas.width * scale)
+        );
+
+        imageCanvas.height = Math.max(
+            1,
+            Math.round(scannerCanvas.height * scale)
+        );
+
+        const ctx = imageCanvas.getContext('2d');
+
+        if (!ctx) {
+            throw new Error('Image processing failed.');
         }
 
-        // AI instructions
-        const systemPrompt = `
-You are an expert visual object identification and condition assessment AI.
+        ctx.drawImage(
+            scannerCanvas,
+            0,
+            0,
+            imageCanvas.width,
+            imageCanvas.height
+        );
 
-Analyze the uploaded image carefully.
+        thumbnail = imageCanvas.toDataURL(
+            'image/jpeg',
+            0.65
+        );
 
-Identify the primary visible object and provide a realistic assessment.
 
-IMPORTANT:
-- Do not invent details that cannot be seen.
-- If the object cannot be identified, say so.
-- Do not claim an object is rare without visual evidence.
-- Do not confuse fictional rarity rankings with actual market value.
-- Describe only visible damage or reasonably identifiable maintenance concerns.
-- If an issue cannot be determined from the image, say "Cannot determine from image."
+        const imageBase64 = thumbnail.split(',')[1];
 
-Return valid JSON only, using this exact structure:
+        if (!imageBase64) {
+            throw new Error('Could not capture camera image.');
+        }
 
-{
-    "objectName": "Object name",
-    "category": "Object category",
-    "rarity": "COMMON, C-RANK, A-RANK, or S-RANK",
-    "description": "One-sentence object description.",
-    "issuesDetected": "Visible damage or maintenance concerns.",
-    "solutions": "Practical maintenance or repair recommendations."
-}
 
-Rarity guidelines:
-COMMON = Ordinary or widely available object.
-C-RANK = Some distinctive characteristics.
-A-RANK = Unusual or notable characteristics.
-S-RANK = Exceptional characteristics supported by visual evidence.
+        // SEND IMAGE TO RENDER BACKEND
 
-If uncertain, use COMMON.
-`;
+        const response = await fetch(
+            APPRAISAL_ENDPOINT,
+            {
+                method: 'POST',
 
-        const payload = {
-            contents: [{
-                role: 'user',
-                parts: [
-                    {
-                        text: 'Identify and appraise the primary object in this image.'
-                    },
-                    {
-                        inlineData: {
-                            mimeType: 'image/jpeg',
-                            data: base64ImageData
-                        }
-                    }
-                ]
-            }],
+                headers: {
+                    'Content-Type': 'application/json'
+                },
 
-            systemInstruction: {
-                parts: [{ text: systemPrompt }]
-            },
-
-            generationConfig: {
-                responseMimeType: 'application/json',
-                temperature: 0.2,
-                maxOutputTokens: 400
+                body: JSON.stringify({
+                    image: imageBase64,
+                    mimeType: 'image/jpeg',
+                    currency: 'PHP'
+                })
             }
-        };
+        );
 
-        // Send request to Gemini
-        const apiUrl = `${GEMINI_API_URL}?key=${encodeURIComponent(customApiKey)}`;
 
-        const response = await fetchWithRetry(apiUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payload)
-        });
-
-        const result = await response.json();
-
-        if (!response.ok) {
-            const errorMessage =
-                result?.error?.message ||
-                `Gemini API error: ${response.status}`;
-
-            throw new Error(errorMessage);
-        }
-
-        // Extract AI response
-        const candidate = result?.candidates?.[0];
-
-        if (!candidate) {
-            throw new Error(
-                result?.promptFeedback?.blockReason
-                    ? `Request blocked: ${result.promptFeedback.blockReason}`
-                    : 'Gemini returned no appraisal result.'
-            );
-        }
-
-        const jsonText = candidate.content?.parts
-            ?.map(part => part.text || '')
-            .join('')
-            .trim();
-
-        if (!jsonText) {
-            throw new Error('Gemini returned an empty response.');
-        }
-
-        // Parse JSON safely
-        let appraisalData;
+        let result;
 
         try {
-            appraisalData = JSON.parse(
-                jsonText
-                    .replace(/^```(?:json)?\s*/i, '')
-                    .replace(/\s*```$/, '')
-                    .trim()
-            );
+            result = await response.json();
         } catch {
-            throw new Error('Gemini returned invalid JSON. Please scan again.');
+            throw new Error('Invalid response from Render server.');
         }
 
-        // Validate required fields
-        const requiredFields = [
-            'objectName',
-            'category',
-            'rarity',
-            'description',
-            'issuesDetected',
-            'solutions'
+        if (!response.ok) {
+            throw new Error(
+                result.error || 'Appraisal request failed.'
+            );
+        }
+
+        if (!result.success || !result.appraisal) {
+            throw new Error('No appraisal received.');
+        }
+
+
+        const data = result.appraisal;
+
+
+        // VALIDATE AND NORMALIZE
+
+        const cleanPrice = value =>
+            typeof value === 'number' &&
+                Number.isFinite(value) &&
+                value >= 0
+                ? value
+                : null;
+
+        const low = cleanPrice(data.estimatedValueLow);
+        const high = cleanPrice(data.estimatedValueHigh);
+
+        const validRanks = [
+            'COMMON',
+            'C-RANK',
+            'A-RANK',
+            'S-RANK'
         ];
 
-        for (const field of requiredFields) {
-            if (
-                typeof appraisalData[field] !== 'string' ||
-                !appraisalData[field].trim()
-            ) {
-                throw new Error(`Missing or invalid appraisal field: ${field}`);
-            }
-        }
+        const validConditions = [
+            'Mint',
+            'Excellent',
+            'Good',
+            'Fair',
+            'Poor',
+            'Unknown'
+        ];
 
-        const validRanks = ['COMMON', 'C-RANK', 'A-RANK', 'S-RANK'];
+        const validConfidence = [
+            'Low',
+            'Medium',
+            'High'
+        ];
 
-        if (!validRanks.includes(appraisalData.rarity)) {
-            appraisalData.rarity = 'COMMON';
-        }
+        const record = {
 
-        // Create appraisal record
-        const scanRecord = {
             id: 'scan_' + Date.now(),
-            timestamp: Date.now(),
-            thumbnail: thumbnailBase64,
 
-            objectName: appraisalData.objectName,
-            category: appraisalData.category,
-            rarity: appraisalData.rarity,
-            description: appraisalData.description,
-            issuesDetected: appraisalData.issuesDetected,
-            solutions: appraisalData.solutions,
+            timestamp: Date.now(),
+
+            thumbnail,
+
+            objectName:
+                String(data.objectName || 'Unknown Object'),
+
+            category:
+                String(data.category || 'Unknown Category'),
+
+            brand:
+                String(data.brand || 'Unknown'),
+
+            model:
+                String(data.model || 'Unknown'),
+
+            rarity:
+                validRanks.includes(data.rarity)
+                    ? data.rarity
+                    : 'COMMON',
+
+            description:
+                String(data.description || 'No description available.'),
+
+            condition:
+                validConditions.includes(data.condition)
+                    ? data.condition
+                    : 'Unknown',
+
+            conditionDetails:
+                String(data.conditionDetails || 'Not available.'),
+
+            authenticityAssessment:
+                String(data.authenticityAssessment || 'Not verified.'),
+
+            estimatedValueLow:
+                low !== null && high !== null && high >= low
+                    ? low
+                    : null,
+
+            estimatedValueHigh:
+                low !== null && high !== null && high >= low
+                    ? high
+                    : null,
+
+            currency: 'PHP',
+
+            valueConfidence:
+                validConfidence.includes(data.valueConfidence)
+                    ? data.valueConfidence
+                    : 'Low',
+
+            valuationNotes:
+                String(data.valuationNotes || 'Not available.'),
+
+            issuesDetected:
+                String(data.issuesDetected || 'None detected.'),
+
+            solutions:
+                String(data.solutions || 'Regular maintenance.'),
+
+            appraisalConfidence:
+                validConfidence.includes(data.appraisalConfidence)
+                    ? data.appraisalConfidence
+                    : 'Low',
 
             sources: []
         };
 
-        // Save to database and display
-        await saveScanToDB(scanRecord);
 
-        displayAppraisalResult(scanRecord);
+        // SAVE TO EXISTING DATABASE
 
-        console.log('Appraisal successful:', scanRecord);
+        if (typeof saveScanToDB === 'function') {
 
-    } catch (err) {
-        console.error('Appraisal error:', err);
+            try {
+                await saveScanToDB(record);
+            } catch (dbError) {
+                console.error('Database error:', dbError);
+            }
+        }
+
+
+        // DISPLAY RESULT
+
+        displayAppraisalResult(record);
+
+        console.log('APPRAISAL RESULT:', record);
+
+    } catch (error) {
+
+        console.error('APPRAISAL ERROR:', error);
 
         alert(
-            'APPRAISAL FAILED\n\n' +
-            (err.message || 'An unexpected error occurred.') +
-            '\n\nPlease check your API key and try again.'
+            'APPRAISAL ERROR\n\n' +
+            error.message
         );
 
     } finally {
-        // Always restore scanner interface
+
         isScanning = false;
 
         laser?.classList.add('hidden');
@@ -270,197 +378,197 @@ If uncertain, use COMMON.
 }
 
 
-// Improved API retry system
-async function fetchWithRetry(
-    url,
-    options,
-    retries = 3,
-    backoff = 1000
-) {
-    let lastError;
+// ==========================================
+// DISPLAY HELPERS
+// ==========================================
 
-    for (let attempt = 0; attempt <= retries; attempt++) {
-        try {
-            const response = await fetch(url, options);
+function setAppraisalText(id, value) {
 
-            // Retry only temporary server/rate-limit errors
-            if (
-                [429, 500, 502, 503, 504].includes(response.status) &&
-                attempt < retries
-            ) {
-                await new Promise(resolve =>
-                    setTimeout(resolve, backoff * Math.pow(2, attempt))
-                );
+    const element = document.getElementById(id);
 
-                continue;
-            }
-
-            return response;
-
-        } catch (error) {
-            lastError = error;
-
-            if (attempt >= retries) {
-                throw error;
-            }
-
-            await new Promise(resolve =>
-                setTimeout(resolve, backoff * Math.pow(2, attempt))
-            );
-        }
+    if (element) {
+        element.textContent =
+            value === null || value === undefined
+                ? 'Not available'
+                : String(value);
     }
-
-    throw lastError || new Error('Network request failed.');
 }
 
 
-// Display appraisal result
+// ==========================================
+// DISPLAY RESULT
+// ==========================================
+
 function displayAppraisalResult(record) {
-    playScanCompleteSound();
 
-    document.getElementById('itemName').textContent =
-        record.objectName || 'Unknown Object';
-
-    document.getElementById('itemClassTag').textContent =
-        record.category || 'ARTIFACT';
-
-    document.getElementById('itemRarity').textContent =
-        record.rarity || 'COMMON';
-
-    document.getElementById('itemDescription').textContent =
-        record.description || '';
-
-    document.getElementById('itemIssues').textContent =
-        record.issuesDetected || 'None detected.';
-
-    document.getElementById('itemSolutions').textContent =
-        record.solutions || 'Regular maintenance recommended.';
-
-    if (record.thumbnail) {
-        document.getElementById('appraisalThumbImg').src =
-            record.thumbnail;
+    if (typeof playScanCompleteSound === 'function') {
+        playScanCompleteSound();
     }
 
-    // Display grounding sources safely
-    const sourcesContainer =
+    setAppraisalText('itemName', record.objectName);
+    setAppraisalText('itemClassTag', record.category);
+    setAppraisalText('itemRarity', record.rarity);
+    setAppraisalText('itemDescription', record.description);
+
+    setAppraisalText('itemBrand', record.brand);
+    setAppraisalText('itemModel', record.model);
+    setAppraisalText('itemCondition', record.condition);
+
+    setAppraisalText('itemConditionDetails', record.conditionDetails);
+
+    setAppraisalText('itemAuthenticity', record.authenticityAssessment);
+
+    setAppraisalText('itemIssues', record.issuesDetected);
+    setAppraisalText('itemSolutions', record.solutions);
+
+    setAppraisalText('itemValueConfidence', record.valueConfidence);
+
+    setAppraisalText('itemAppraisalConfidence', record.appraisalConfidence);
+
+    setAppraisalText('itemValuationNotes', record.valuationNotes);
+
+
+    // PRICE DISPLAY
+
+    let price = 'Unable to estimate';
+
+    if (
+        typeof record.estimatedValueLow === 'number' &&
+        typeof record.estimatedValueHigh === 'number'
+    ) {
+
+        const formatter = new Intl.NumberFormat('en-PH', {
+            style: 'currency',
+            currency: 'PHP',
+            maximumFractionDigits: 0
+        });
+
+        price =
+            formatter.format(record.estimatedValueLow) +
+            ' - ' +
+            formatter.format(record.estimatedValueHigh);
+    }
+
+    setAppraisalText('itemEstimatedValue', price);
+
+
+    // IMAGE
+
+    const thumbnail =
+        document.getElementById('appraisalThumbImg');
+
+    if (thumbnail && record.thumbnail) {
+        thumbnail.src = record.thumbnail;
+    }
+
+
+    // SOURCES
+
+    const sources =
         document.getElementById('groundingSources');
 
-    sourcesContainer.replaceChildren();
-
-    if (record.sources?.length > 0) {
-        const heading = document.createElement('span');
-
-        heading.className = 'text-slate-400 w-full';
-        heading.textContent = 'SOURCES:';
-
-        sourcesContainer.appendChild(heading);
-
-        record.sources.slice(0, 3).forEach(src => {
-            if (!src.uri) return;
-
-            const link = document.createElement('a');
-
-            link.href = src.uri;
-            link.target = '_blank';
-            link.rel = 'noopener noreferrer';
-            link.className =
-                'underline text-cyan-400 hover:text-cyan-200 truncate max-w-[140px]';
-
-            link.textContent = src.title || 'View Source';
-
-            sourcesContainer.appendChild(link);
-        });
+    if (sources) {
+        sources.replaceChildren();
     }
 
+
+    // SHOW CARD
+
     document.getElementById('appraisalCard')
-        .classList.remove('hidden');
+        ?.classList.remove('hidden');
 }
 
 
-// Close appraisal card
+// ==========================================
+// CLOSE CARD
+// ==========================================
+
 function closeAppraisalCard() {
+
     document.getElementById('appraisalCard')
-        .classList.add('hidden');
+        ?.classList.add('hidden');
 }
 
 
-// Capture appraisal snapshot
+// ==========================================
+// SNAPSHOT EXPORT
+// ==========================================
+
 function captureSnapshot() {
-    const tempCanvas = document.createElement('canvas');
 
-    tempCanvas.width = canvas.width;
-    tempCanvas.height = canvas.height;
+    const scannerCanvas = getScannerCanvas();
 
-    const tCtx = tempCanvas.getContext('2d');
-
-    if (!tCtx) {
-        alert('Unable to create snapshot.');
+    if (!scannerCanvas) {
+        alert('Camera is unavailable.');
         return;
     }
 
-    tCtx.drawImage(canvas, 0, 0);
+    const output = document.createElement('canvas');
 
-    // Appraisal information panel
-    const panelX = 30;
-    const panelY = 30;
-    const panelWidth = Math.min(500, tempCanvas.width - 60);
-    const panelHeight = 190;
+    output.width = scannerCanvas.width;
+    output.height = scannerCanvas.height;
 
-    tCtx.save();
+    const ctx = output.getContext('2d');
 
-    tCtx.fillStyle = 'rgba(15, 23, 42, 0.95)';
-    tCtx.fillRect(panelX, panelY, panelWidth, panelHeight);
-
-    tCtx.strokeStyle = '#f59e0b';
-    tCtx.lineWidth = 2;
-
-    tCtx.strokeRect(panelX, panelY, panelWidth, panelHeight);
-
-    tCtx.font = 'bold 16px Orbitron';
-    tCtx.fillStyle = '#f59e0b';
-
-    tCtx.fillText(
-        document.getElementById('itemName').textContent,
-        panelX + 15,
-        panelY + 30,
-        panelWidth - 30
-    );
-
-    tCtx.font = '11px "Share Tech Mono"';
-    tCtx.fillStyle = '#38bdf8';
-
-    const details = [
-        'CLASS: ' + document.getElementById('itemClassTag').textContent,
-        'RARITY: ' + document.getElementById('itemRarity').textContent,
-        'ISSUES: ' + document.getElementById('itemIssues').textContent,
-        'SOLUTIONS: ' + document.getElementById('itemSolutions').textContent
-    ];
-
-    details.forEach((line, index) => {
-        tCtx.fillText(
-            line,
-            panelX + 15,
-            panelY + 60 + (index * 27),
-            panelWidth - 30
-        );
-    });
-
-    tCtx.restore();
+    if (!ctx) return;
 
     try {
-        const imageURI = tempCanvas.toDataURL('image/png');
+
+        ctx.drawImage(scannerCanvas, 0, 0);
+
+        ctx.fillStyle = 'rgba(15,23,42,0.96)';
+
+        ctx.fillRect(20, 20, 520, 260);
+
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 2;
+
+        ctx.strokeRect(20, 20, 520, 260);
+
+        ctx.font = 'bold 18px Orbitron';
+        ctx.fillStyle = '#f59e0b';
+
+        ctx.fillText(
+            document.getElementById('itemName')?.textContent || 'OBJECT',
+            35, 55, 480
+        );
+
+        ctx.font = '12px monospace';
+
+        const lines = [
+            'CLASS: ' + (document.getElementById('itemClassTag')?.textContent || ''),
+            'RARITY: ' + (document.getElementById('itemRarity')?.textContent || ''),
+            'VALUE: ' + (document.getElementById('itemEstimatedValue')?.textContent || ''),
+            'CONDITION: ' + (document.getElementById('itemCondition')?.textContent || ''),
+            'ISSUES: ' + (document.getElementById('itemIssues')?.textContent || ''),
+            'SOLUTIONS: ' + (document.getElementById('itemSolutions')?.textContent || '')
+        ];
+
+        lines.forEach((line, index) => {
+
+            ctx.fillStyle = index === 2 ? '#f59e0b' : '#38bdf8';
+
+            ctx.fillText(
+                line,
+                35,
+                90 + index * 27,
+                480
+            );
+        });
 
         const link = document.createElement('a');
 
-        link.download = `Scouter_Report_${Date.now()}.png`;
-        link.href = imageURI;
+        link.download =
+            'Scouter_Report_' + Date.now() + '.png';
 
-        document.body.appendChild(link);
+        link.href = output.toDataURL('image/png');
+
         link.click();
-        link.remove();
 
     } catch (error) {
+
         console.error('Snapshot error:', error);
-        alert('Unable to export snapshot.');
+
+        alert('Could not export snapshot.');
     }
 }

@@ -1,222 +1,420 @@
 <!DOCTYPE html>
 <html lang="en" class="h-full bg-slate-950 text-slate-100 select-none">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
     <title>OBJECT SCOUTER</title>
-    <!-- Tailwind CSS -->
+
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome Icons -->
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Fonts -->
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-    <!-- Custom CSS -->
+
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap"
+        rel="stylesheet">
+
     <link rel="stylesheet" href="css/styles.css">
 </head>
+
 <body class="h-full bg-slate-950 text-slate-100 crt-scanlines relative overflow-hidden">
 
-    <!-- HIDDEN VIDEO ELEMENT -->
     <video id="webcam" class="hidden" playsinline muted></video>
 
-    <!-- MAIN RENDER CANVAS -->
-    <canvas id="appCanvas" class="absolute inset-0 w-full h-full z-0 cursor-crosshair"></canvas>
+    <canvas id="appCanvas" class="absolute inset-0 w-full h-full z-0 cursor-crosshair">
+    </canvas>
 
-    <!-- SCANNING LASER OVERLAY -->
-    <div id="scanningLaser" class="hidden absolute left-0 right-0 h-1.5 bg-gradient-to-r from-transparent via-pink-500 to-transparent shadow-[0_0_30px_#ec4899] z-10 animate-laser pointer-events-none"></div>
+    <div id="scanningLaser"
+        class="hidden absolute left-0 right-0 h-1.5 bg-gradient-to-r from-transparent via-pink-500 to-transparent shadow-[0_0_30px_#ec4899] z-10 animate-laser pointer-events-none">
+    </div>
 
-    <!-- MAIN HUD UI LAYER -->
     <div class="absolute inset-0 z-20 pointer-events-none flex flex-col justify-between p-3 sm:p-5">
-        
-        <!-- TOP NAVIGATION & STATUS BAR -->
+
+        <!-- TOP NAVIGATION -->
         <div class="flex justify-between items-start w-full gap-2">
-            
-            <!-- Left Info Panel -->
-            <div class="pointer-events-auto cyber-glass p-3 rounded-xl border-l-4 border-l-cyan-400 flex flex-col gap-1 min-w-[160px] sm:min-w-[190px]">
-                <div class="flex items-center justify-between text-cyan-400 font-orbitron text-xs font-bold tracking-wider">
-                    <span class="flex items-center gap-1.5">
-                        <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping"></span>
+
+            <div
+                class="pointer-events-auto cyber-glass p-3 rounded-xl border-l-4 border-l-cyan-400 flex flex-col gap-1 min-w-[160px] sm:min-w-[190px]">
+
+                <div
+                    class="flex items-center justify-between text-cyan-400 font-orbitron text-xs font-bold tracking-wider">
+                    <span>
+                        <i class="fa-solid fa-circle-dot mr-1"></i>
                         FULL-VIEW HUD
                     </span>
-                    <span id="camSourceBadge" class="text-[9px] bg-cyan-950/80 px-1.5 py-0.5 rounded text-cyan-300">USER CAM</span>
+
+                    <span id="camSourceBadge" class="text-[9px] bg-cyan-950/80 px-1.5 py-0.5 rounded text-cyan-300">
+                        USER CAM
+                    </span>
                 </div>
+
                 <div class="text-[10px] font-mono-tech text-slate-300 flex justify-between pt-1">
                     <span>MODE:</span>
                     <span class="text-emerald-400 font-bold">FULL CAMERA LOCK</span>
                 </div>
+
                 <div class="text-[10px] font-mono-tech text-slate-400 flex justify-between">
                     <span>STATUS:</span>
-                    <span id="scouterStatusTextTop" class="text-cyan-300 font-bold">ACTIVE SCANNER</span>
+                    <span id="scouterStatusTextTop" class="text-cyan-300 font-bold">
+                        ACTIVE SCANNER
+                    </span>
                 </div>
+
             </div>
 
-            <!-- Header Title -->
             <div class="hidden lg:flex flex-col items-center">
-                <div class="font-orbitron text-sm font-black tracking-widest text-cyan-300 bg-slate-950/80 px-6 py-1.5 rounded-b-xl border-b-2 border-cyan-500/60 shadow-[0_0_20px_rgba(6,182,212,0.4)] flex items-center gap-2">
-                    <i class="fa-solid fa-eye text-pink-400 animate-pulse"></i>
+
+                <div
+                    class="font-orbitron text-sm font-black tracking-widest text-cyan-300 bg-slate-950/80 px-6 py-1.5 rounded-b-xl border-b-2 border-cyan-500/60">
+                    <i class="fa-solid fa-eye text-pink-400"></i>
                     OBJECT SCOUTER
                 </div>
+
                 <div class="text-[9px] font-mono-tech text-cyan-400/70 tracking-widest mt-1">
                     AI OBJECT ANALYSIS & ARCHIVE
                 </div>
+
             </div>
 
-            <!-- Right Controls -->
             <div class="pointer-events-auto flex items-center gap-2">
-                <button onclick="toggleInventoryDrawer()" 
-                        class="cyber-glass px-3 py-2 rounded-xl text-xs font-mono-tech text-amber-400 hover:border-amber-400 hover:bg-amber-500/20 active:scale-95 transition-all flex items-center gap-1.5"
-                        title="View Saved Scans Log">
-                    <i class="fa-solid fa-box-archive text-amber-400"></i>
-                    <span class="hidden sm:inline font-bold">INVENTORY</span>
-                    <span id="inventoryBadgeCount" class="bg-amber-500 text-slate-950 px-1.5 py-0.2 rounded-full text-[10px] font-bold">0</span>
+
+                <button onclick="toggleInventoryDrawer()"
+                    class="cyber-glass px-3 py-2 rounded-xl text-xs font-mono-tech text-amber-400 flex items-center gap-1.5">
+
+                    <i class="fa-solid fa-box-archive"></i>
+                    <span class="hidden sm:inline">INVENTORY</span>
+
+                    <span id="inventoryBadgeCount"
+                        class="bg-amber-500 text-slate-950 px-1.5 rounded-full text-[10px] font-bold">
+                        0
+                    </span>
                 </button>
 
-                <button onclick="toggleSettingsMenu()" 
-                        class="cyber-glass p-2.5 rounded-xl text-cyan-300 hover:border-cyan-300 hover:bg-cyan-500/20 active:scale-95 transition-all"
-                        title="Engine Settings">
-                    <i class="fa-solid fa-gear text-sm"></i>
+                <button onclick="toggleSettingsMenu()" class="cyber-glass p-2.5 rounded-xl text-cyan-300">
+
+                    <i class="fa-solid fa-gear"></i>
                 </button>
 
-                <button onclick="toggleAudioMute()" 
-                        class="cyber-glass p-2.5 rounded-xl text-cyan-300 hover:border-cyan-300 hover:bg-cyan-500/20 active:scale-95 transition-all"
-                        title="Toggle Sound">
-                    <i id="audioBtnIcon" class="fa-solid fa-volume-high text-sm"></i>
+                <button onclick="toggleAudioMute()" class="cyber-glass p-2.5 rounded-xl text-cyan-300">
+
+                    <i id="audioBtnIcon" class="fa-solid fa-volume-high"></i>
                 </button>
+
             </div>
         </div>
 
-        <!-- ENGINE SETTINGS DRAWER -->
-        <div id="settingsDrawer" class="hidden pointer-events-auto my-2 max-w-sm ml-auto w-full cyber-glass p-4 rounded-xl border border-cyan-400/50 shadow-2xl transition-all">
+
+        <!-- SETTINGS DRAWER -->
+        <div id="settingsDrawer"
+            class="hidden pointer-events-auto my-2 max-w-sm ml-auto w-full cyber-glass p-4 rounded-xl border border-cyan-400/50 shadow-2xl">
+
             <div class="flex justify-between items-center border-b border-cyan-500/30 pb-2 mb-3">
-                <h4 class="font-orbitron text-xs font-bold text-cyan-300 flex items-center gap-1.5">
-                    <i class="fa-solid fa-sliders text-amber-400"></i> ENGINE SETTINGS
+
+                <h4 class="font-orbitron text-xs font-bold text-cyan-300">
+                    <i class="fa-solid fa-sliders text-amber-400"></i>
+                    ENGINE SETTINGS
                 </h4>
-                <button onclick="toggleSettingsMenu()" class="text-slate-400 hover:text-white text-xs">
+
+                <button onclick="toggleSettingsMenu()">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
+
             </div>
-            
+
             <div class="space-y-3 text-xs font-mono-tech">
+
                 <div>
-                    <span class="text-slate-400 block mb-1">AI APPRAISAL ENGINE:</span>
-                    <div class="bg-slate-900/80 p-2 rounded-lg border border-slate-700/60 text-emerald-400 font-bold flex items-center justify-between">
-                        <span>GEMINI VISION AI</span>
-                        <i class="fa-solid fa-check-circle text-xs"></i>
+                    <span class="text-slate-400 block mb-1">
+                        AI APPRAISAL ENGINE:
+                    </span>
+
+                    <div class="bg-slate-900/80 p-2 rounded-lg border border-slate-700 text-emerald-400 font-bold">
+                        VISION AI
                     </div>
                 </div>
+
+                <div>
+                    <span class="text-slate-400 block mb-1">
+                        API CONNECTION:
+                    </span>
+
+                    <div
+                        class="bg-slate-900/80 p-3 rounded-lg border border-cyan-500/30 flex justify-between items-center">
+
+                        <span>RENDER BACKEND</span>
+
+                        <span id="geminiApiStatus" class="text-amber-400 font-bold">
+                            CHECKING...
+                        </span>
+
+                    </div>
+
+                    <button onclick="checkGeminiConnection()"
+                        class="w-full mt-2 bg-cyan-500/20 border border-cyan-400 text-cyan-300 font-bold p-2 rounded-lg">
+
+                        <i class="fa-solid fa-rotate mr-1"></i>
+                        CHECK CONNECTION
+                    </button>
+
+                    <p class="text-[9px] text-slate-500 mt-2">
+                        API key is securely configured on Render.
+                        No API key is needed in this browser.
+                    </p>
+                </div>
+
             </div>
         </div>
 
-        <!-- APPRAISAL CARD MODAL -->
-        <div id="appraisalCard" class="hidden pointer-events-auto my-auto sm:my-0 sm:mt-auto sm:mb-4 mx-auto sm:ml-4 sm:mr-auto max-w-sm w-full bofuri-card p-3 rounded-xl z-30 transition-all transform scale-100">
-            <div class="flex justify-between items-center border-b border-cyan-500/40 pb-1.5 mb-2">
-                <div class="flex items-center gap-1.5">
-                    <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
-                    <span class="text-[9px] font-orbitron text-cyan-300 font-bold tracking-widest">SYSTEM APPRAISAL // HUD</span>
-                </div>
+
+        <!-- APPRAISAL CARD -->
+        <div id="appraisalCard"
+            class="hidden pointer-events-auto my-auto sm:my-0 sm:mt-auto sm:mb-4 mx-auto sm:ml-4 sm:mr-auto max-w-sm w-full bofuri-card p-3 rounded-xl z-30">
+
+            <div class="flex justify-between items-center border-b border-cyan-500/40 pb-2 mb-2">
+
+                <span class="text-[9px] font-orbitron text-cyan-300 font-bold">
+                    SYSTEM APPRAISAL // HUD
+                </span>
+
                 <div class="flex items-center gap-2">
-                    <span id="itemRarity" class="font-orbitron font-extrabold text-[9px] px-2 py-0.5 bg-gradient-to-r from-cyan-500 to-pink-500 text-slate-950 rounded shadow">S-RANK</span>
-                    <button onclick="closeAppraisalCard()" class="text-slate-400 hover:text-white text-xs">
+
+                    <span id="itemRarity"
+                        class="font-orbitron font-extrabold text-[9px] px-2 py-1 bg-gradient-to-r from-cyan-500 to-pink-500 text-slate-950 rounded">
+                        COMMON
+                    </span>
+
+                    <button onclick="closeAppraisalCard()">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
+
                 </div>
             </div>
 
-            <div class="flex gap-3 items-start relative">
-                <div class="flex flex-col items-center flex-shrink-0 z-10">
-                    <div class="bofuri-thumb-frame w-16 h-16 rounded-lg overflow-hidden border-2 border-amber-400 bg-slate-900 shadow-[0_0_12px_rgba(245,158,11,0.6)]">
-                        <img id="appraisalThumbImg" src="https://placehold.co/100x100/0f172a/06b6d4?text=SCAN" class="w-full h-full object-cover">
+
+            <!-- OBJECT IDENTIFICATION -->
+            <div class="flex gap-3 items-start">
+
+                <div class="flex flex-col items-center flex-shrink-0">
+
+                    <div class="w-16 h-16 rounded-lg overflow-hidden border-2 border-amber-400 bg-slate-900">
+                        <img id="appraisalThumbImg" src="https://placehold.co/100x100/0f172a/06b6d4?text=SCAN"
+                            class="w-full h-full object-cover">
                     </div>
-                    <span id="itemClassTag" class="mt-1 text-[8px] font-mono-tech bg-amber-500/20 text-amber-300 px-1 py-0.5 rounded uppercase font-bold text-center w-full truncate border border-amber-500/40">ARTIFACT</span>
+
+                    <span id="itemClassTag" class="mt-1 text-[8px] bg-amber-500/20 text-amber-300 px-1 py-1 rounded">
+                        ARTIFACT
+                    </span>
+
                 </div>
 
-                <div class="flex-1 space-y-1.5 font-mono-tech text-[10px] min-w-0 pl-1">
-                    <div class="bofuri-pointer-line bg-slate-900/90 p-1.5 rounded border-l-2 border-l-cyan-400 border border-slate-800 shadow">
-                        <span class="text-[8px] text-cyan-400 uppercase block font-bold">TARGET IDENTIFIED:</span>
-                        <h2 id="itemName" class="font-orbitron font-black text-xs text-amber-300 truncate">OBJECT NAME</h2>
+
+                <div class="flex-1 space-y-2 font-mono-tech text-[10px] min-w-0">
+
+                    <div class="bg-slate-900 p-2 rounded border-l-2 border-cyan-400">
+                        <span class="text-cyan-400 text-[8px] block">
+                            TARGET IDENTIFIED
+                        </span>
+
+                        <h2 id="itemName" class="font-orbitron font-black text-xs text-amber-300">
+                            OBJECT NAME
+                        </h2>
                     </div>
 
-                    <div class="bofuri-pointer-line bg-slate-900/90 p-1.5 rounded border-l-2 border-l-pink-500 border border-slate-800 shadow">
-                        <p id="itemDescription" class="text-slate-200 text-[9px] leading-snug line-clamp-2">
-                            Object analysis description...
-                        </p>
-                    </div>
+                    <p id="itemDescription" class="text-slate-200 text-[9px] leading-snug">
+                        Object description...
+                    </p>
 
-                    <div class="grid grid-cols-2 gap-1 pt-0.5">
-                        <div class="bg-slate-900/90 p-1 rounded border-l-2 border-l-red-500 border border-slate-800 shadow">
-                            <span class="text-red-400 text-[7px] font-bold block uppercase">ISSUE:</span>
-                            <p id="itemIssues" class="text-slate-300 text-[9px] truncate">None</p>
+                    <div class="grid grid-cols-2 gap-1">
+
+                        <div class="bg-slate-900 p-2 rounded">
+                            <span class="text-red-400 text-[8px]">ISSUE</span>
+                            <p id="itemIssues">None detected</p>
                         </div>
-                        <div class="bg-slate-900/90 p-1 rounded border-l-2 border-l-emerald-400 border border-slate-800 shadow">
-                            <span class="text-emerald-400 text-[7px] font-bold block uppercase">SOLUTION:</span>
-                            <p id="itemSolutions" class="text-slate-300 text-[9px] truncate">Regular upkeep</p>
+
+                        <div class="bg-slate-900 p-2 rounded">
+                            <span class="text-emerald-400 text-[8px]">SOLUTION</span>
+                            <p id="itemSolutions">Regular maintenance</p>
                         </div>
+
                     </div>
 
-                    <div id="groundingSources" class="flex flex-wrap gap-1 text-[8px] text-cyan-400/80 pt-0.5"></div>
                 </div>
             </div>
 
-            <div class="mt-2 pt-1.5 border-t border-cyan-500/30 flex justify-between items-center">
-                <button onclick="captureSnapshot()" class="px-2 py-0.5 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/50 rounded text-cyan-300 font-orbitron text-[9px] font-bold flex items-center gap-1">
-                    <i class="fa-solid fa-camera"></i> SAVE CARD
+
+            <!-- VALUATION -->
+            <div class="mt-3 bg-slate-900 p-3 rounded-lg border border-amber-500/40">
+
+                <span class="text-amber-400 text-[9px] font-bold">
+                    ESTIMATED MARKET VALUE
+                </span>
+
+                <p id="itemEstimatedValue" class="text-emerald-400 font-orbitron font-bold text-lg">
+                    Not available
+                </p>
+
+                <p class="text-[8px] text-slate-500">
+                    Preliminary AI estimate - not a verified sale price
+                </p>
+
+            </div>
+
+
+            <!-- ADDITIONAL DETAILS -->
+            <div class="grid grid-cols-2 gap-2 mt-2 font-mono-tech text-[9px]">
+
+                <div class="bg-slate-900 p-2 rounded">
+                    <span class="text-cyan-400">BRAND</span>
+                    <p id="itemBrand">Unknown</p>
+                </div>
+
+                <div class="bg-slate-900 p-2 rounded">
+                    <span class="text-cyan-400">MODEL</span>
+                    <p id="itemModel">Unknown</p>
+                </div>
+
+                <div class="bg-slate-900 p-2 rounded">
+                    <span class="text-cyan-400">CONDITION</span>
+                    <p id="itemCondition">Unknown</p>
+                </div>
+
+                <div class="bg-slate-900 p-2 rounded">
+                    <span class="text-cyan-400">VALUE CONFIDENCE</span>
+                    <p id="itemValueConfidence">Low</p>
+                </div>
+
+            </div>
+
+
+            <div class="mt-2 space-y-2 font-mono-tech text-[9px]">
+
+                <div class="bg-slate-900 p-2 rounded">
+                    <span class="text-cyan-400">CONDITION DETAILS</span>
+                    <p id="itemConditionDetails">Not available</p>
+                </div>
+
+                <div class="bg-slate-900 p-2 rounded">
+                    <span class="text-pink-400">AUTHENTICITY ASSESSMENT</span>
+                    <p id="itemAuthenticity">Not available</p>
+                </div>
+
+                <div class="bg-slate-900 p-2 rounded">
+                    <span class="text-emerald-400">APPRAISAL CONFIDENCE</span>
+                    <p id="itemAppraisalConfidence">Low</p>
+                </div>
+
+                <div class="bg-slate-900 p-2 rounded">
+                    <span class="text-amber-400">VALUATION NOTES</span>
+                    <p id="itemValuationNotes">Not available</p>
+                </div>
+
+            </div>
+
+
+            <div id="groundingSources" class="flex flex-wrap gap-1 text-[8px] text-cyan-400 pt-2">
+            </div>
+
+
+            <!-- BUTTONS -->
+            <div class="mt-3 pt-2 border-t border-cyan-500/30 flex justify-between">
+
+                <button onclick="captureSnapshot()"
+                    class="px-3 py-2 bg-cyan-500/20 border border-cyan-400 rounded text-cyan-300 text-[9px] font-bold">
+
+                    <i class="fa-solid fa-camera"></i>
+                    SAVE CARD
                 </button>
-                <button onclick="closeAppraisalCard()" class="px-2.5 py-0.5 bg-slate-900 hover:bg-slate-800 rounded text-slate-300 font-orbitron text-[9px]">
+
+                <button onclick="closeAppraisalCard()" class="px-3 py-2 bg-slate-900 rounded text-slate-300 text-[9px]">
+
                     CLOSE
                 </button>
+
             </div>
+
         </div>
 
-        <!-- BOTTOM ACTION BUTTON -->
-        <div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-auto flex items-center justify-center gap-3 w-11/12 max-w-sm px-2">
-            <button id="scanBtn" onclick="appraiseObjectWithGemini()" 
-                    class="flex-1 py-4 px-6 rounded-2xl bg-gradient-to-r from-cyan-500 via-pink-500 to-amber-500 text-slate-950 font-orbitron font-black text-sm tracking-wider uppercase shadow-[0_0_30px_rgba(6,182,212,0.9)] hover:shadow-[0_0_45px_rgba(236,72,153,1)] active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer border-2 border-cyan-300">
-                <i class="fa-solid fa-magnifying-glass text-slate-950 text-base"></i>
-                <span id="scanBtnText" class="font-black tracking-widest text-slate-950">APPRAISE OBJECT</span>
+
+        <!-- SCANNER BUTTONS -->
+        <div
+            class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-auto flex items-center gap-3 w-11/12 max-w-sm px-2">
+
+            <button id="scanBtn" onclick="appraiseObjectWithGemini()"
+                class="flex-1 py-4 px-6 rounded-2xl bg-gradient-to-r from-cyan-500 via-pink-500 to-amber-500 text-slate-950 font-orbitron font-black text-sm uppercase shadow-lg flex items-center justify-center gap-2">
+
+                <i class="fa-solid fa-magnifying-glass"></i>
+
+                <span id="scanBtnText">
+                    APPRAISE OBJECT
+                </span>
+
             </button>
 
-            <button onclick="toggleCameraFacing()" 
-                    class="p-4 rounded-2xl bg-slate-950/90 border-2 border-cyan-400 text-cyan-300 hover:bg-cyan-500/20 active:scale-95 transition-all shadow-[0_0_20px_rgba(6,182,212,0.5)] flex-shrink-0 cursor-pointer"
-                    title="Switch Camera">
-                <i class="fa-solid fa-camera-rotate text-base"></i>
+            <button onclick="toggleCameraFacing()"
+                class="p-4 rounded-2xl bg-slate-950 border-2 border-cyan-400 text-cyan-300">
+
+                <i class="fa-solid fa-camera-rotate"></i>
+
             </button>
+
         </div>
+
     </div>
 
-    <!-- INVENTORY ARCHIVE DRAWER -->
-    <div id="inventoryDrawer" class="fixed inset-y-0 right-0 z-40 w-full sm:w-96 cyber-glass p-5 flex flex-col justify-between transform translate-x-full transition-transform duration-300 border-l border-amber-500/40 pointer-events-auto">
+
+    <!-- INVENTORY -->
+    <div id="inventoryDrawer"
+        class="fixed inset-y-0 right-0 z-40 w-full sm:w-96 cyber-glass p-5 flex flex-col justify-between transform translate-x-full transition-transform duration-300 border-l border-amber-500/40 pointer-events-auto">
+
         <div>
+
             <div class="flex justify-between items-center border-b border-cyan-500/30 pb-3 mb-4">
-                <h3 class="font-orbitron font-bold text-cyan-300 text-base flex items-center gap-2">
-                    <i class="fa-solid fa-database text-amber-400"></i> SCOUTER ARCHIVE
+
+                <h3 class="font-orbitron font-bold text-cyan-300">
+                    <i class="fa-solid fa-database text-amber-400"></i>
+                    SCOUTER ARCHIVE
                 </h3>
-                <button onclick="toggleInventoryDrawer()" class="text-slate-400 hover:text-white text-lg">
+
+                <button onclick="toggleInventoryDrawer()">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
+
             </div>
 
-            <div class="mb-4">
-                <input type="text" id="inventorySearch" oninput="filterInventory()" placeholder="Filter saved items..." 
-                       class="w-full bg-slate-900/90 border border-cyan-500/40 rounded-xl px-3.5 py-2 text-xs text-cyan-300 focus:outline-none focus:border-cyan-300 font-mono-tech">
+            <input type="text" id="inventorySearch" oninput="filterInventory()" placeholder="Filter saved items..."
+                class="w-full bg-slate-900 border border-cyan-500/40 rounded-xl p-3 text-xs text-cyan-300">
+
+            <div id="inventoryList" class="space-y-2.5 overflow-y-auto max-h-[calc(100vh-220px)] mt-4">
             </div>
 
-            <div id="inventoryList" class="space-y-2.5 overflow-y-auto max-h-[calc(100vh-220px)] pr-1"></div>
         </div>
 
-        <div class="pt-3 border-t border-slate-800 flex justify-between items-center">
-            <span id="dbStorageStatus" class="text-[10px] font-mono-tech text-slate-400">STORAGE: INDEXEDDB (FREE)</span>
-            <button onclick="clearAllScans()" class="text-[11px] font-mono-tech text-red-400 hover:text-red-300 underline">
+        <div class="pt-3 border-t border-slate-800 flex justify-between">
+
+            <span id="dbStorageStatus" class="text-[10px] text-slate-400">
+                STORAGE: INDEXEDDB
+            </span>
+
+            <button onclick="clearAllScans()" class="text-[11px] text-red-400 underline">
                 CLEAR DATABASE
             </button>
+
         </div>
+
     </div>
 
-    <!-- APPLICATION JAVASCRIPT MODULES -->
+
+    <!-- JAVASCRIPT -->
     <script src="js/audio.js"></script>
     <script src="js/db.js"></script>
     <script src="js/camera.js"></script>
     <script src="js/ai.js"></script>
     <script src="js/main.js"></script>
+
 </body>
+
 </html>
