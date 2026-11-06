@@ -168,6 +168,26 @@
                         <i class="fa-solid fa-check-circle text-xs"></i>
                     </div>
                 </div>
+
+            <div class="space-y-2">
+                <div class="flex items-center justify-between gap-2">
+                    <label for="apiKeyInput" class="text-slate-400 block">GEMINI API KEY:</label>
+                    <span id="apiKeyStatus" class="text-[9px] font-bold uppercase text-amber-300">UNSET</span>
+                </div>
+                <input id="apiKeyInput" type="password" autocomplete="off" spellcheck="false" placeholder="Enter Gemini API key"
+                       class="w-full bg-slate-900/90 border border-cyan-500/40 rounded-xl px-3 py-2 text-cyan-300 focus:outline-none focus:border-cyan-300 font-mono-tech">
+                <div class="flex gap-2">
+                    <button onclick="saveApiKey()" class="flex-1 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/50 rounded-lg px-3 py-2 text-cyan-300 font-bold uppercase tracking-wide">
+                        Save key
+                    </button>
+                    <button onclick="clearApiKey()" class="flex-1 bg-slate-800/80 hover:bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-slate-300 font-bold uppercase tracking-wide">
+                        Clear
+                    </button>
+                </div>
+                <p class="text-[9px] text-slate-400 leading-relaxed">
+                    Add a Gemini API key to enable object recognition. If no key is configured, the app will stay in demo mode.
+                </p>
+            </div>
             </div>
         </div>
 
@@ -314,7 +334,45 @@
         const targetFPS = 30;
         const frameInterval = 1000 / targetFPS;
 
-        let customApiKey = sessionStorage.getItem('GEMINI_CUSTOM_API_KEY') || '';
+        const GEMINI_API_STORAGE_KEY = 'GEMINI_CUSTOM_API_KEY';
+        const GEMINI_MODEL = 'gemini-2.0-flash';
+        let customApiKey = localStorage.getItem(GEMINI_API_STORAGE_KEY) || sessionStorage.getItem(GEMINI_API_STORAGE_KEY) || '';
+
+        function syncApiKeyUI() {
+            const input = document.getElementById('apiKeyInput');
+            const status = document.getElementById('apiKeyStatus');
+
+            if (input) input.value = customApiKey;
+            if (status) {
+                status.textContent = customApiKey ? 'READY' : 'UNSET';
+                status.className = customApiKey
+                    ? 'text-[9px] font-bold uppercase text-emerald-300'
+                    : 'text-[9px] font-bold uppercase text-amber-300';
+            }
+        }
+
+        function saveApiKey() {
+            const key = document.getElementById('apiKeyInput')?.value.trim() || '';
+            customApiKey = key;
+            if (key) {
+                localStorage.setItem(GEMINI_API_STORAGE_KEY, key);
+                sessionStorage.setItem(GEMINI_API_STORAGE_KEY, key);
+            } else {
+                localStorage.removeItem(GEMINI_API_STORAGE_KEY);
+                sessionStorage.removeItem(GEMINI_API_STORAGE_KEY);
+            }
+            syncApiKeyUI();
+            if (key) {
+                document.getElementById('scouterStatusTextTop').textContent = 'API KEY READY';
+            }
+        }
+
+        function clearApiKey() {
+            customApiKey = '';
+            localStorage.removeItem(GEMINI_API_STORAGE_KEY);
+            sessionStorage.removeItem(GEMINI_API_STORAGE_KEY);
+            syncApiKeyUI();
+        }
 
         // --- AUDIO SYNTHESIZER ---
         function initAudioContext() {
@@ -653,7 +711,18 @@ Return ONLY a structured JSON response following this schema:
                 generationConfig: { responseMimeType: "application/json" }
             };
 
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${customApiKey}`;
+            if (!customApiKey) {
+                isScanning = false;
+                document.getElementById('scanningLaser').classList.add('hidden');
+                document.getElementById('scanBtnText').textContent = 'ADD API KEY';
+                document.getElementById('scouterStatusTextTop').textContent = 'API KEY REQUIRED';
+                toggleSettingsMenu();
+                syncApiKeyUI();
+                alert('Add your Gemini API key in the settings drawer to enable AI appraisals.');
+                return;
+            }
+
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(customApiKey)}`;
 
             try {
                 const response = await fetchWithRetry(apiUrl, {
@@ -808,6 +877,7 @@ Return ONLY a structured JSON response following this schema:
         function toggleSettingsMenu() {
             const menu = document.getElementById('settingsDrawer');
             menu.classList.toggle('hidden');
+            syncApiKeyUI();
         }
 
         window.addEventListener('pointerdown', (e) => {
@@ -818,6 +888,7 @@ Return ONLY a structured JSON response following this schema:
 
         window.addEventListener('load', async () => {
             initCameraElements();
+            syncApiKeyUI();
             await initDatabase();
             startCamera();
             requestAnimationFrame(renderLoop);
